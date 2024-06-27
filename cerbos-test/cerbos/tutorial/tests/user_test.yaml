@@ -1,0 +1,56 @@
+---
+name: UserTestSuite
+description: Tests for verifying the user resource policy
+
+principals:
+  admin:
+    id: global_admin1
+    roles:
+      - GLOBAL_ADMIN
+
+  call_taker:
+    id: call_taker1
+    roles:
+      - CALL_TAKER
+    attr:
+      cncId: cnc1
+
+  user2:
+    id: user1
+    roles:
+      - user
+
+resources:
+  call:
+    kind: call
+    id: call1
+
+tests:
+  - name: User CRUD Actions
+    input:
+      principals:
+        - global_admin1
+        - call_taker1
+        - user1
+
+      resources:
+        - call1
+        
+      actions:
+        - read
+
+    expected:
+      - principal: global_admin1
+        resource: call1
+        actions:
+          read: EFFECT_ALLOW
+
+      - principal: call_taker1
+        resource: call1
+        actions:
+          read: EFFECT_ALLOW
+
+      - principal: user1
+        resource: call1
+        actions:
+          read: EFFECT_DENY

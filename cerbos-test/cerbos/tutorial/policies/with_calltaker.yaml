@@ -1,0 +1,19 @@
+---
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  resource: call
+  version: default
+  rules:
+  - actions:
+    - "*"
+    effect: EFFECT_ALLOW
+    roles:
+    - GLOBAL_ADMIN
+  - actions:
+    - READ
+    effect: EFFECT_ALLOW
+    roles:
+    - CALL_TAKER
+    condition:
+      match:
+        expr: request.resource.attr.owner == request.principal.owner

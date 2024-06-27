@@ -1,0 +1,14 @@
+version: "3.9"
+services:
+  cerbos:
+    container_name: cerbos-test
+    image: ghcr.io/cerbos/cerbos:latest
+    restart: always
+    command: ["server", "--config=/config/conf.yaml", "--log-level=warn"]
+    volumes:
+      - ./cerbos/config:/config
+      - ./cerbos/policies:/policies
+      - ./sock:/tmp/sock
+    ports:
+      - 3592:3592
+      - 3593:3593
