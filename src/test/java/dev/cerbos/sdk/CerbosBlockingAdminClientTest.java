@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import dev.cerbos.api.v1.policy.PolicyOuterClass;
 import dev.cerbos.api.v1.schema.SchemaOuterClass;
+import io.envoyproxy.pgv.ValidationException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,9 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -85,6 +89,40 @@ class CerbosBlockingAdminClientTest extends CerbosClientTests {
         requestBuilder.addOrUpdate();
     }
 
+    private String generateJsonPolicy(String resource) {
+        return """
+            {
+                        "apiVersion": "api.cerbos.dev/v1",
+                        "resourcePolicy": {
+                            "resource": "%s",
+                            "version": "default",
+                            "rules": [
+                                {
+                                    "actions": [
+                                        "*"
+                                    ],
+                                    "effect": "EFFECT_ALLOW",
+                                    "roles": [
+                                        "GLOBAL_ADMIN2"
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+            """.formatted(resource);
+    }
+
+    private void addJsonPolicy() throws ValidationException, IOException {
+        AddOrUpdatePolicyRequestBuilder requestBuilder = this.adminClient.addOrUpdatePolicy();
+
+        for (int i = 0; i < 4; i++) {
+            String jsonPolicy = generateJsonPolicy("resource" + i);
+            requestBuilder.with(jsonPolicy);
+        }
+
+        requestBuilder.addOrUpdate();
+    }
+
     private void addPolicies(AddOrUpdatePolicyRequestBuilder requestBuilder, File file) {
         try {
             String fileName = file.getName();
@@ -128,11 +166,32 @@ class CerbosBlockingAdminClientTest extends CerbosClientTests {
     }
 
     @Test
-    void getPolicy() {
+    void getPolicy() throws Exception {
+        executeAddJsonPolicyInParallel();
+
         List<PolicyOuterClass.Policy> have = this.adminClient.getPolicy("resource.leave_request.vdefault");
         Assertions.assertNotNull(have);
         Assertions.assertEquals(1, have.size());
         Assertions.assertEquals("leave_request", have.get(0).getResourcePolicy().getResource());
+    }
+
+    private void addJsonPolicyWrapper() {
+        try {
+            addJsonPolicy();
+        } catch (ValidationException | IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void executeAddJsonPolicyInParallel() throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Future<?> future1 = executor.submit(this::addJsonPolicyWrapper);
+        Future<?> future2 = executor.submit(this::addJsonPolicyWrapper);
+
+        future1.get();
+        future2.get();
+
+        executor.shutdown();
     }
 
     @Test
